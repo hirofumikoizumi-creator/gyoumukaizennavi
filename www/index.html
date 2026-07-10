@@ -44,7 +44,12 @@ header.appbar{
 }
 header.appbar h1{font-size:17px;font-weight:700;}
 header.appbar .sub{font-size:11px;opacity:.85;}
-.screen{display:none;padding:16px;max-width:760px;margin:0 auto;}
+.screen{
+  display:none;
+  padding:16px 16px calc(var(--tabbar-h) + var(--banner-h) + env(safe-area-inset-bottom) + 36px);
+  max-width:760px;
+  margin:0 auto;
+}
 .screen.active{display:block;animation:fadein .18s ease;}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
