@@ -1,79 +1,1143 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a5cb8">
-  <title>業務改善ナビ</title>
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>業務改善ナビ | タイムスタディ &amp; ECRS分析</title>
+<style>
+/* ============================================================
+   業務改善ナビ - HTMLプロトタイプ
+   ①業務棚卸し(計測) ②棚卸し(コア/非コア×ECRS) ③時間分析 ④改善提案
+   ※CODEX実装時の注意点は各所の【CODEX】コメント参照
+   ============================================================ */
+:root{
+  --primary:#0a5cb8;
+  --primary-light:#e8f1fb;
+  --accent:#00a389;
+  --danger:#e0453a;
+  --warn:#e8920a;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1c2733;
+  --sub:#6b7a8c;
+  --line:#e3e8ef;
+  --core:#0a5cb8;
+  --noncore:#e8920a;
+  --radius:14px;
+  --tabbar-h:64px;
+  --banner-h:50px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:var(--bg);color:var(--text);font-size:15px;
+  padding-bottom:calc(var(--tabbar-h) + var(--banner-h) + env(safe-area-inset-bottom));
+}
+header.appbar{
+  position:sticky;top:0;z-index:50;
+  background:var(--primary);color:#fff;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+header.appbar h1{font-size:17px;font-weight:700;}
+header.appbar .sub{font-size:11px;opacity:.85;}
+.screen{display:none;padding:16px;max-width:760px;margin:0 auto;}
+.screen.active{display:block;animation:fadein .18s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+.card h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.muted{color:var(--sub);font-size:12px;}
+button{font-family:inherit;cursor:pointer;border:none;}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;
+  background:var(--primary);color:#fff;transition:opacity .15s;
+}
+.btn:active{opacity:.7;}
+.btn.ghost{background:var(--primary-light);color:var(--primary);}
+.btn.danger{background:#fdecea;color:var(--danger);}
+.btn.accent{background:var(--accent);}
+.btn.small{padding:6px 10px;font-size:12px;border-radius:8px;}
+.btn.block{width:100%;}
+/* ---------- タブバー ---------- */
+nav.tabbar{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  background:#fff;border-top:1px solid var(--line);
+  display:flex;
+}
+nav.tabbar button{
+  flex:1;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:10px;color:var(--sub);font-weight:600;
+}
+nav.tabbar button .ico{font-size:20px;line-height:1;}
+nav.tabbar button.active{color:var(--primary);}
+nav.tabbar button .badge{
+  position:absolute;margin-left:26px;margin-top:-30px;
+  background:var(--danger);color:#fff;font-size:9px;border-radius:8px;padding:1px 5px;display:none;
+}
+/* ---------- ① 計測 ---------- */
+.timer-display{
+  text-align:center;padding:18px 0 8px;
+}
+.timer-display .time{
+  font-size:52px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;
+}
+.timer-display .task-name{font-size:15px;color:var(--sub);margin-top:2px;min-height:22px;}
+.timer-display.running .time{color:var(--accent);}
+.rec-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--danger);margin-right:6px;animation:blink 1s infinite;vertical-align:1px;}
+@keyframes blink{50%{opacity:.2}}
+.task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.task-btn{
+  background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+  padding:14px 10px;text-align:center;font-size:14px;font-weight:600;color:var(--text);
+  display:flex;flex-direction:column;gap:4px;align-items:center;position:relative;
+}
+.task-btn .cat{font-size:10px;color:var(--sub);font-weight:500;}
+.task-btn .today{font-size:11px;color:var(--primary);font-weight:700;}
+.task-btn.running{border-color:var(--accent);background:#eafaf6;color:var(--accent);}
+.task-btn.running::after{content:"計測中";position:absolute;top:-8px;right:-4px;background:var(--accent);color:#fff;font-size:9px;padding:2px 7px;border-radius:8px;}
+.task-btn.add{border-style:dashed;color:var(--sub);justify-content:center;}
+.log-list{list-style:none;}
+.log-list li{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.log-list li:last-child{border-bottom:none;}
+.log-list .t{font-variant-numeric:tabular-nums;color:var(--sub);}
+.log-list .del{color:var(--danger);background:none;font-size:15px;padding:2px 6px;}
+/* ---------- ② 棚卸し ---------- */
+.inv-item{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+.inv-item .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.inv-item .head .name{font-weight:700;font-size:15px;}
+.inv-item .head .time{font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums;}
+.seg{display:flex;background:var(--bg);border-radius:9px;padding:3px;margin-bottom:8px;}
+.seg button{flex:1;padding:7px 4px;border-radius:7px;font-size:12px;font-weight:600;background:none;color:var(--sub);}
+.seg button.sel-core{background:var(--core);color:#fff;}
+.seg button.sel-noncore{background:var(--noncore);color:#fff;}
+.ecrs{display:flex;gap:6px;flex-wrap:wrap;}
+.ecrs button{
+  flex:1;min-width:56px;padding:8px 2px;border-radius:8px;font-size:11px;font-weight:600;
+  background:var(--bg);color:var(--sub);border:1.5px solid transparent;
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+}
+.ecrs button .en{font-size:13px;font-weight:800;}
+.ecrs button.sel{background:var(--primary-light);color:var(--primary);border-color:var(--primary);}
+.ai-reason{font-size:11px;color:var(--accent);margin-top:8px;background:#eafaf6;border-radius:8px;padding:7px 9px;display:none;}
+.ai-reason.show{display:block;}
+.ai-bar{display:flex;gap:8px;margin-bottom:14px;}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+.pill.core{background:var(--primary-light);color:var(--core);}
+.pill.noncore{background:#fdf3e3;color:var(--noncore);}
+/* ---------- ③ 分析 ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+.kpi{background:var(--card);border-radius:var(--radius);padding:14px;text-align:center;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+.kpi .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;}
+.kpi .l{font-size:11px;color:var(--sub);margin-top:2px;}
+.kpi.core .v{color:var(--core);}
+.kpi.noncore .v{color:var(--noncore);}
+.bar-row{margin-bottom:12px;}
+.bar-row .lbl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+.bar-row .track{height:14px;background:var(--bg);border-radius:7px;overflow:hidden;}
+.bar-row .fill{height:100%;border-radius:7px;background:var(--primary);transition:width .5s ease;}
+.donut-wrap{display:flex;align-items:center;gap:20px;justify-content:center;padding:8px 0;}
+.legend{font-size:12px;}
+.legend div{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.legend .sw{width:12px;height:12px;border-radius:3px;}
+/* ---------- ④ 提案 ---------- */
+.proposal{border-left:4px solid var(--primary);background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+.proposal.p-high{border-left-color:var(--danger);}
+.proposal.p-mid{border-left-color:var(--warn);}
+.proposal.p-low{border-left-color:var(--accent);}
+.proposal .p-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.proposal .p-title{font-weight:700;font-size:14px;}
+.proposal .p-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fdecea;color:var(--danger);}
+.proposal.p-mid .p-tag{background:#fdf3e3;color:var(--warn);}
+.proposal.p-low .p-tag{background:#eafaf6;color:var(--accent);}
+.proposal .p-body{font-size:13px;line-height:1.65;color:#33414f;}
+.proposal .p-saving{margin-top:8px;font-size:12px;font-weight:700;color:var(--accent);}
+.empty{
+  text-align:center;color:var(--sub);padding:36px 16px;font-size:13px;line-height:1.8;
+}
+.empty .big{font-size:36px;display:block;margin-bottom:8px;}
+/* ---------- モーダル ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(10,20,35,.45);z-index:100;display:none;align-items:flex-end;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:#fff;width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));}
+.modal h3{font-size:16px;margin-bottom:14px;}
+.modal input,.modal select{
+  width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;margin-bottom:12px;font-family:inherit;background:#fff;
+}
+.modal .row{display:flex;gap:10px;}
+.modal .row .btn{flex:1;}
+/* ---------- 業種×職種オンボーディング ---------- */
+.modal-bg.center{align-items:center;padding:16px;}
+.modal-bg.center .modal{border-radius:18px;max-height:86vh;overflow-y:auto;}
+.ob-step{font-size:12px;font-weight:700;color:var(--primary);margin:14px 0 8px;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chips button{
+  padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;
+  background:var(--bg);color:var(--sub);border:1.5px solid transparent;
+}
+.chips button.sel{background:var(--primary-light);color:var(--primary);border-color:var(--primary);}
+.ob-preview{
+  margin-top:12px;background:var(--bg);border-radius:10px;padding:10px 12px;
+  font-size:12px;color:var(--sub);line-height:1.8;display:none;
+}
+.ob-preview.show{display:block;}
+.profile-chip{
+  display:inline-block;font-size:10px;background:rgba(255,255,255,.18);color:#fff;
+  border-radius:8px;padding:1px 8px;margin-left:6px;vertical-align:1px;
+}
+/* ---------- 広告（モック） ---------- */
+/* 【CODEX】ネイティブ実装時はAdMob SDKに置換。
+   banner_main: ca-app-pub-5840457424714744/9086977514
+   Reward_main: ca-app-pub-5840457424714744/2329997478 */
+.ad-banner{
+  position:fixed;left:0;right:0;z-index:55;
+  bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  height:var(--banner-h);
+  background:repeating-linear-gradient(45deg,#eef1f5,#eef1f5 10px,#e6eaf0 10px,#e6eaf0 20px);
+  border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:11px;color:var(--sub);
+}
+.ad-banner .ad-label{
+  background:#c3ccd6;color:#fff;font-size:9px;font-weight:800;
+  padding:1px 6px;border-radius:4px;letter-spacing:1px;
+}
+.reward-lock{
+  background:linear-gradient(135deg,#1c2733,#2a3b4d);color:#fff;
+  border-radius:var(--radius);padding:18px 16px;margin-bottom:14px;text-align:center;
+  box-shadow:0 2px 8px rgba(20,40,70,.18);
+}
+.reward-lock .rl-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+.reward-lock .rl-desc{font-size:12px;opacity:.85;line-height:1.7;margin-bottom:12px;}
+.reward-lock .btn{background:#ffb300;color:#3a2a00;font-weight:800;}
+.reward-unlocked-note{
+  font-size:11px;color:var(--accent);background:#eafaf6;border-radius:8px;
+  padding:7px 10px;margin-bottom:12px;text-align:center;font-weight:600;
+}
+.reward-video{
+  background:#0d1420;border-radius:12px;height:170px;margin-bottom:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:#fff;font-size:13px;
+}
+.reward-video .rv-count{font-size:34px;font-weight:800;color:#ffb300;font-variant-numeric:tabular-nums;}
+.detail-plan{border-left:4px solid #7b5cd6;background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+.detail-plan .dp-title{font-weight:700;font-size:14px;margin-bottom:8px;}
+.detail-plan ol{padding-left:20px;font-size:13px;line-height:1.8;color:#33414f;}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar-h) + var(--banner-h) + 20px);
+  background:#22303e;color:#fff;font-size:13px;padding:10px 18px;border-radius:22px;z-index:200;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.toast.show{opacity:1;}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin:4px 2px 12px;}
+.section-head h2{font-size:16px;}
+@media (min-width:600px){
+  .task-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
+  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+}
+</style>
 </head>
 <body>
-  <header class="app-header">
-    <div>
-      <p class="eyebrow">Business Improvement</p>
-      <h1>業務改善ナビ</h1>
+
+<header class="appbar">
+  <div>
+    <h1 id="appTitle">業務改善ナビ</h1>
+    <div class="sub" id="appSub">タイムスタディ × ECRS分析</div>
+  </div>
+  <button class="btn small ghost" style="background:rgba(255,255,255,.18);color:#fff;" onclick="app.openSettings()">⚙ 設定</button>
+</header>
+
+<!-- ==================== ① 業務棚卸し（計測） ==================== -->
+<section class="screen active" id="screen-timer">
+  <div class="card">
+    <div class="timer-display" id="timerDisplay">
+      <div class="time" id="timerTime">00:00:00</div>
+      <div class="task-name" id="timerTask">業務ボタンをタップして計測開始</div>
     </div>
-    <button id="resetBtn" class="icon-btn" type="button" aria-label="リセット">↺</button>
-  </header>
+    <button class="btn danger block" id="stopBtn" style="display:none;" onclick="app.stopTimer()">■ 計測を終了する</button>
+  </div>
 
-  <main>
-    <section class="panel focus-panel">
-      <label for="taskInput">改善したい業務</label>
-      <textarea id="taskInput" rows="4" placeholder="例：月次報告書の集計に時間がかかる"></textarea>
-      <div class="actions">
-        <button id="classifyBtn" type="button">分類する</button>
-        <button id="timerBtn" type="button" class="secondary">5分で整理</button>
-      </div>
-    </section>
+  <div class="section-head">
+    <h2>業務メニュー</h2>
+    <span class="muted">タップで開始 / 別業務タップで切替</span>
+  </div>
+  <div class="task-grid" id="taskGrid"></div>
 
-    <section class="tabs" aria-label="改善メニュー">
-      <button class="tab active" type="button" data-tab="input">入力</button>
-      <button class="tab" type="button" data-tab="plan">提案</button>
-      <button class="tab" type="button" data-tab="reward">詳細</button>
-    </section>
+  <div class="card" style="margin-top:16px;">
+    <h2>📋 本日の記録 <span class="muted" id="todayTotal"></span></h2>
+    <ul class="log-list" id="logList"></ul>
+    <div class="empty" id="logEmpty"><span class="big">⏱</span>まだ記録がありません。<br>業務ボタンをタップして計測を始めましょう。</div>
+  </div>
+</section>
 
-    <section id="inputTab" class="tab-panel active">
-      <div class="grid">
-        <article class="mini-card">
-          <span class="label">分類</span>
-          <strong id="categoryText">未分類</strong>
-        </article>
-        <article class="mini-card">
-          <span class="label">優先度</span>
-          <strong id="priorityText">-</strong>
-        </article>
-        <article class="mini-card">
-          <span class="label">整理タイマー</span>
-          <strong id="timerText">05:00</strong>
-        </article>
-      </div>
-    </section>
+<!-- ==================== ② 棚卸し ==================== -->
+<section class="screen" id="screen-inventory">
+  <div class="section-head">
+    <h2>業務の棚卸し</h2>
+    <span class="muted" id="invCount"></span>
+  </div>
+  <div class="ai-bar">
+    <!-- 【CODEX】本実装ではここをLLM API呼び出しに置換（プロンプト例はJS内 aiClassify 参照） -->
+    <button class="btn accent block" onclick="app.aiClassifyAll()">✨ AIで自動判定（コア/非コア × ECRS）</button>
+  </div>
+  <div id="invList"></div>
+  <div class="empty" id="invEmpty"><span class="big">🗂</span>計測データがありません。<br>「計測」タブで業務時間を記録してください。</div>
+</section>
 
-    <section id="planTab" class="tab-panel">
-      <ol id="planList" class="plan-list"></ol>
-    </section>
+<!-- ==================== ③ 時間分析 ==================== -->
+<section class="screen" id="screen-analysis">
+  <div class="section-head">
+    <h2>時間分析</h2>
+    <span class="muted">記録全期間</span>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="v" id="kpiTotal">-</div><div class="l">総記録時間</div></div>
+    <div class="kpi"><div class="v" id="kpiTasks">-</div><div class="l">業務項目数</div></div>
+    <div class="kpi core"><div class="v" id="kpiCore">-</div><div class="l">コア業務比率</div></div>
+    <div class="kpi noncore"><div class="v" id="kpiNoncore">-</div><div class="l">非コア業務比率</div></div>
+  </div>
 
-    <section id="rewardTab" class="tab-panel">
-      <div class="unlock-box">
-        <div>
-          <span class="label">詳細プラン</span>
-          <h2 id="unlockTitle">広告視聴で24時間解放</h2>
-        </div>
-        <button id="rewardBtn" type="button">解放する</button>
-      </div>
-      <div id="detailPlan" class="detail-plan locked"></div>
-    </section>
-  </main>
+  <div class="card">
+    <h2>🎯 コア / 非コア構成比</h2>
+    <div class="donut-wrap">
+      <canvas id="donut" width="150" height="150"></canvas>
+      <div class="legend" id="donutLegend"></div>
+    </div>
+  </div>
 
-  <nav class="bottom-nav" aria-label="主要操作">
-    <button type="button" data-tab-target="input">入力</button>
-    <button type="button" data-tab-target="plan">提案</button>
-    <button type="button" data-tab-target="reward">詳細</button>
-  </nav>
+  <div class="card">
+    <h2>⏳ 業務別 時間構成（上位）</h2>
+    <div id="barChart"></div>
+  </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" type="module"></script>
+  <div class="card">
+    <h2>🔧 ECRS分類別 時間</h2>
+    <div id="ecrsChart"></div>
+    <p class="muted" style="margin-top:8px;">E=排除 / C=結合 / R=交換(順序・場所・人の入替) / S=簡素化</p>
+  </div>
+</section>
+
+<!-- ==================== ④ 改善の提案 ==================== -->
+<section class="screen" id="screen-proposal">
+  <div class="section-head">
+    <h2>改善の提案</h2>
+    <button class="btn small ghost" onclick="app.renderProposals(true)">↻ 再生成</button>
+  </div>
+  <div class="card" id="proposalSummary" style="display:none;">
+    <h2>📈 改善ポテンシャル</h2>
+    <div class="p-body" id="proposalSummaryBody" style="font-size:13px;line-height:1.7;"></div>
+  </div>
+  <div id="proposalList"></div>
+  <!-- リワード広告で解放される「詳細アクションプラン」セクション -->
+  <div id="rewardSection"></div>
+  <div class="empty" id="propEmpty"><span class="big">💡</span>「棚卸し」タブでコア/非コアとECRSを分類すると、<br>改善方針を提案します。</div>
+</section>
+
+<!-- 広告バナー枠（モック）【CODEX】AdMob banner_main に置換 -->
+<div class="ad-banner" id="adBanner">
+  <span class="ad-label">AD</span>バナー広告枠 320×50（banner_main）
+</div>
+
+<!-- ==================== タブバー ==================== -->
+<nav class="tabbar">
+  <button class="active" data-screen="screen-timer" onclick="app.switchTab(this)"><span class="ico">⏱</span>計測</button>
+  <button data-screen="screen-inventory" onclick="app.switchTab(this)"><span class="ico">🗂</span>棚卸し</button>
+  <button data-screen="screen-analysis" onclick="app.switchTab(this)"><span class="ico">📊</span>分析</button>
+  <button data-screen="screen-proposal" onclick="app.switchTab(this)"><span class="ico">💡</span>提案</button>
+</nav>
+
+<!-- 業務追加モーダル -->
+<div class="modal-bg" id="modalAdd">
+  <div class="modal">
+    <h3>業務を追加</h3>
+    <input type="text" id="newTaskName" placeholder="業務名（例：日報作成）">
+    <select id="newTaskCat">
+      <option value="営業">営業</option>
+      <option value="事務">事務</option>
+      <option value="会議">会議</option>
+      <option value="資料作成">資料作成</option>
+      <option value="移動">移動</option>
+      <option value="休憩">休憩</option>
+      <option value="食事">食事</option>
+      <option value="その他" selected>その他</option>
+    </select>
+    <div class="row">
+      <button class="btn ghost" onclick="app.closeModal('modalAdd')">キャンセル</button>
+      <button class="btn" onclick="app.addTask()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 業種×職種オンボーディングモーダル -->
+<div class="modal-bg center" id="modalOnboard">
+  <div class="modal">
+    <h3>🏢 業種と職種を選択</h3>
+    <p class="muted" style="margin-bottom:4px;">選択した内容に合わせて、業務メニューの基本セットを自動作成します。あとから自由に追加・変更できます。</p>
+    <div class="ob-step">STEP 1｜業種</div>
+    <div class="chips" id="obIndustry"></div>
+    <div class="ob-step" id="obJobLabel" style="display:none;">STEP 2｜職種</div>
+    <div class="chips" id="obJob"></div>
+    <div class="ob-preview" id="obPreview"></div>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn ghost" id="obSkip" onclick="app.skipOnboard()">スキップ（汎用メニュー）</button>
+      <button class="btn" id="obStart" disabled style="opacity:.4;" onclick="app.applyOnboard()">この内容で開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-bg" id="modalSettings">
+  <div class="modal">
+    <h3>設定</h3>
+    <button class="btn ghost block" style="margin-bottom:10px;" onclick="app.openOnboard(true)">🏢 業種×職種を変更（メニュー再生成）</button>
+    <button class="btn ghost block" style="margin-bottom:10px;" onclick="app.loadSampleData()">🧪 デモ用サンプルデータを投入</button>
+    <button class="btn ghost block" style="margin-bottom:10px;" onclick="app.exportCSV()">📤 記録をCSVエクスポート</button>
+    <button class="btn danger block" style="margin-bottom:10px;" onclick="app.resetAll()">🗑 全データをリセット</button>
+    <button class="btn block" onclick="app.closeModal('modalSettings')">閉じる</button>
+  </div>
+</div>
+
+<!-- リワード広告モーダル（モック）【CODEX】AdMob Reward_main のSDK呼び出しに置換 -->
+<div class="modal-bg center" id="modalReward">
+  <div class="modal" style="text-align:center;">
+    <h3>🎬 動画広告（モック）</h3>
+    <div class="reward-video">
+      <div class="rv-count" id="rewardCount">5</div>
+      <div>広告動画を再生中…</div>
+      <div style="font-size:10px;opacity:.6;">実装時はここでAdMobリワード動画が再生されます</div>
+    </div>
+    <button class="btn block" id="rewardDoneBtn" disabled style="opacity:.4;" onclick="app.finishReward()">視聴完了までお待ちください</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="capacitor.js"></script>
+<script>
+/* ============================================================
+   業務改善ナビ - アプリケーションロジック
+   【CODEX実装時の置き換えポイント】
+   1. STORAGE: localStorage → バックエンドAPI + DB（マルチユーザー/企業対応）
+   2. aiClassify(): キーワードルール → LLM API呼び出し
+      プロンプト例:
+      「以下の業務名と時間データについて、(a)コア業務(顧客価値・売上に直結)か
+       非コア業務(間接・管理・移動等)かを判定し、(b)ECRSフレームワークで
+       最も適した改善アプローチ(Eliminate/Combine/Rearrange/Simplify/対象外)を
+       選び、理由を50字以内で返してください。JSON形式:
+       {"core": true|false, "ecrs": "E|C|R|S|none", "reason": "..."}」
+   3. renderProposals(): テンプレート生成 → LLMによる自由記述の改善提案生成
+   4. PWA化: manifest.json + Service Worker を追加しホーム画面追加に対応
+   ============================================================ */
+'use strict';
+
+const ECRS_DEF = {
+  E:{en:'E', ja:'排除', desc:'やめられないか'},
+  C:{en:'C', ja:'結合', desc:'まとめられないか'},
+  R:{en:'R', ja:'交換', desc:'順序・人・場所を変えられないか'},
+  S:{en:'S', ja:'簡素化', desc:'単純化・自動化できないか'},
+  none:{en:'－', ja:'対象外', desc:'現状維持'}
+};
+
+const DEFAULT_TASKS = [
+  {id:'t1', name:'商談・顧客対応', cat:'営業'},
+  {id:'t2', name:'社内会議',       cat:'会議'},
+  {id:'t3', name:'資料作成',       cat:'資料作成'},
+  {id:'t4', name:'メール・チャット対応', cat:'事務'},
+  {id:'t5', name:'データ入力・転記', cat:'事務'},
+  {id:'t6', name:'移動',           cat:'移動'},
+  {id:'t7', name:'休憩',           cat:'休憩'},
+  {id:'t8', name:'食事',           cat:'食事'},
+];
+
+/* 全プリセット共通で追加する業務（休憩・食事）。
+   業種×職種を問わず必ず計測対象に含める。
+   【CODEX】法定休憩の記録を残す用途もあるため、削除不可のピン留め項目として
+   実装するのも有効（棚卸しでの誤削除防止）。 */
+const COMMON_TASKS = [
+  {name:'休憩', cat:'休憩'},
+  {name:'食事', cat:'食事'},
+];
+
+/* ============================================================
+   業種×職種プリセット
+   初回起動時に選択 → 該当する基本業務メニューを自動生成する。
+   【CODEX】本実装ではマスタをDB管理とし、管理画面から企業ごとに
+   カスタマイズ可能にする。LLMで業種・職種の自由入力から
+   メニューを動的生成する拡張も有効。
+   ============================================================ */
+const PRESETS = {
+  '製造業': {
+    '営業': [
+      {name:'商談・顧客対応',cat:'営業'},{name:'見積・受注処理',cat:'事務'},{name:'納期調整・仕入先対応',cat:'調整'},
+      {name:'クレーム対応',cat:'営業'},{name:'社内会議',cat:'会議'},{name:'資料作成',cat:'資料作成'},
+      {name:'メール・電話対応',cat:'事務'},{name:'移動',cat:'移動'}],
+    '製造・現場': [
+      {name:'段取り・準備',cat:'現場'},{name:'加工・組立作業',cat:'現場'},{name:'検査・品質チェック',cat:'現場'},
+      {name:'設備保全・清掃',cat:'現場'},{name:'部材運搬・ピッキング',cat:'現場'},{name:'日報・記録記入',cat:'事務'},
+      {name:'朝礼・ミーティング',cat:'会議'},{name:'手待ち・待機',cat:'その他'}],
+    '生産管理・購買': [
+      {name:'生産計画立案',cat:'企画'},{name:'発注・仕入処理',cat:'事務'},{name:'在庫確認・棚卸',cat:'現場'},
+      {name:'納期調整',cat:'調整'},{name:'データ入力・転記',cat:'事務'},{name:'社内会議',cat:'会議'},{name:'資料作成',cat:'資料作成'}],
+    '事務・総務': [
+      {name:'受発注データ入力',cat:'事務'},{name:'請求書・伝票処理',cat:'事務'},{name:'電話・来客対応',cat:'事務'},
+      {name:'経費・勤怠処理',cat:'事務'},{name:'資料作成',cat:'資料作成'},{name:'社内会議',cat:'会議'}],
+  },
+  '建設業': {
+    '施工管理': [
+      {name:'現場巡回・安全管理',cat:'現場'},{name:'職人・協力会社との調整',cat:'調整'},{name:'写真整理・施工記録',cat:'事務'},
+      {name:'工程表作成・更新',cat:'資料作成'},{name:'発注・材料手配',cat:'事務'},{name:'安全書類等の作成',cat:'事務'},
+      {name:'会議・打合せ',cat:'会議'},{name:'移動',cat:'移動'}],
+    '営業': [
+      {name:'商談・顧客対応',cat:'営業'},{name:'現地調査',cat:'現場'},{name:'見積作成',cat:'資料作成'},
+      {name:'契約・申請手続き',cat:'事務'},{name:'会議・打合せ',cat:'会議'},{name:'移動',cat:'移動'}],
+    '事務': [
+      {name:'請求書・伝票処理',cat:'事務'},{name:'安全書類作成',cat:'事務'},{name:'電話対応',cat:'事務'},
+      {name:'データ入力・転記',cat:'事務'},{name:'社内会議',cat:'会議'}],
+  },
+  '小売・飲食・サービス': {
+    '店舗スタッフ': [
+      {name:'接客・販売',cat:'接客'},{name:'レジ業務',cat:'接客'},{name:'品出し・陳列',cat:'現場'},
+      {name:'在庫確認・発注',cat:'事務'},{name:'清掃・整理',cat:'現場'},{name:'開店・閉店作業',cat:'現場'},
+      {name:'ミーティング',cat:'会議'}],
+    '店長・マネージャー': [
+      {name:'接客・販売',cat:'接客'},{name:'シフト作成',cat:'事務'},{name:'売上集計・報告',cat:'事務'},
+      {name:'発注・在庫管理',cat:'事務'},{name:'スタッフ教育',cat:'育成'},{name:'クレーム対応',cat:'接客'},
+      {name:'本部対応・会議',cat:'会議'}],
+    '本部・事務': [
+      {name:'データ集計・分析',cat:'企画'},{name:'資料作成',cat:'資料作成'},{name:'会議',cat:'会議'},
+      {name:'メール・電話対応',cat:'事務'},{name:'店舗巡回・移動',cat:'移動'}],
+  },
+  '医療・福祉': {
+    '介護職': [
+      {name:'直接介助（食事・入浴・排泄）',cat:'ケア'},{name:'見守り・巡回',cat:'ケア'},{name:'記録作成',cat:'事務'},
+      {name:'送迎',cat:'移動'},{name:'レクリエーション',cat:'ケア'},{name:'申し送り・会議',cat:'会議'},
+      {name:'清掃・環境整備',cat:'現場'}],
+    '看護職': [
+      {name:'診療補助・処置',cat:'ケア'},{name:'バイタル測定・観察',cat:'ケア'},{name:'記録・カルテ入力',cat:'事務'},
+      {name:'申し送り',cat:'会議'},{name:'患者・家族対応',cat:'接客'},{name:'会議・委員会',cat:'会議'}],
+    '事務': [
+      {name:'受付・窓口対応',cat:'接客'},{name:'レセプト・請求業務',cat:'事務'},{name:'電話対応',cat:'事務'},
+      {name:'データ入力・転記',cat:'事務'},{name:'書類作成',cat:'資料作成'}],
+  },
+  'IT・情報通信': {
+    'エンジニア': [
+      {name:'設計・開発',cat:'開発'},{name:'テスト・レビュー',cat:'開発'},{name:'障害対応',cat:'開発'},
+      {name:'ドキュメント作成',cat:'資料作成'},{name:'会議',cat:'会議'},{name:'チャット・メール対応',cat:'事務'},
+      {name:'タスク管理・進捗報告',cat:'事務'}],
+    '営業': [
+      {name:'商談・顧客対応',cat:'営業'},{name:'提案書作成',cat:'資料作成'},{name:'見積・契約処理',cat:'事務'},
+      {name:'会議',cat:'会議'},{name:'メール・チャット対応',cat:'事務'},{name:'移動',cat:'移動'}],
+    'PM・ディレクター': [
+      {name:'進捗管理',cat:'管理'},{name:'顧客折衝',cat:'営業'},{name:'レビュー・品質確認',cat:'開発'},
+      {name:'会議',cat:'会議'},{name:'資料作成',cat:'資料作成'},{name:'チャット・メール対応',cat:'事務'}],
+  },
+  '士業・コンサルティング': {
+    'コンサルタント': [
+      {name:'クライアント面談',cat:'営業'},{name:'調査・リサーチ',cat:'企画'},{name:'分析・資料作成',cat:'資料作成'},
+      {name:'提案書作成',cat:'資料作成'},{name:'社内会議',cat:'会議'},{name:'案件管理・報告',cat:'事務'},
+      {name:'メール対応',cat:'事務'},{name:'移動',cat:'移動'}],
+    '事務・アシスタント': [
+      {name:'書類作成・チェック',cat:'事務'},{name:'データ入力・転記',cat:'事務'},{name:'電話・メール対応',cat:'事務'},
+      {name:'請求処理',cat:'事務'},{name:'会議',cat:'会議'}],
+  },
+  'その他（汎用）': {
+    '営業': [
+      {name:'商談・顧客対応',cat:'営業'},{name:'見積・提案書作成',cat:'資料作成'},{name:'社内会議',cat:'会議'},
+      {name:'メール・チャット対応',cat:'事務'},{name:'データ入力・転記',cat:'事務'},{name:'移動',cat:'移動'}],
+    '事務・バックオフィス': [
+      {name:'データ入力・転記',cat:'事務'},{name:'書類・伝票処理',cat:'事務'},{name:'電話・来客対応',cat:'事務'},
+      {name:'資料作成',cat:'資料作成'},{name:'社内会議',cat:'会議'}],
+    '企画・管理': [
+      {name:'企画・分析業務',cat:'企画'},{name:'資料作成',cat:'資料作成'},{name:'社内会議',cat:'会議'},
+      {name:'メンバー管理・1on1',cat:'管理'},{name:'メール・チャット対応',cat:'事務'},{name:'報告・承認業務',cat:'事務'}],
+  },
+};
+
+/* AI自動判定のルールベース実装（本実装時はLLM APIに置換）*/
+const AI_RULES = [
+  {kw:['商談','顧客','営業','提案','クライアント','受注','販売','接客'], core:true,  ecrs:'none', reason:'顧客価値・売上に直結するコア業務。時間の拡大を推奨'},
+  {kw:['企画','設計','開発','分析','戦略'],                              core:true,  ecrs:'S',    reason:'コア業務。テンプレート化・ツール活用で更に生産性向上余地あり'},
+  {kw:['転記','入力','コピー','手作業','集計'],                          core:false, ecrs:'S',    reason:'定型作業。RPA/システム連携による自動化(簡素化)が有効'},
+  {kw:['会議','ミーティング','打合せ','打ち合わせ'],                     core:false, ecrs:'C',    reason:'会議は目的別に統合・アジェンダ化で時間圧縮が可能(結合)'},
+  {kw:['メール','チャット','電話','問い合わせ','問合せ'],                core:false, ecrs:'S',    reason:'テンプレート・FAQ・AI下書きで対応時間を簡素化できる'},
+  {kw:['移動','出張','通勤'],                                            core:false, ecrs:'E',    reason:'オンライン化・訪問ルート見直しで移動自体を排除・削減可能'},
+  {kw:['報告','日報','週報','承認','申請','稟議'],                       core:false, ecrs:'E',    reason:'報告・承認プロセスは廃止または自動化候補(排除)'},
+  {kw:['資料','スライド','ドキュメント','書類'],                         core:false, ecrs:'S',    reason:'フォーマット統一・AI生成活用で作成時間を簡素化できる'},
+  {kw:['探す','検索','確認','チェック','照合'],                          core:false, ecrs:'R',    reason:'情報の一元化・順序見直し(交換)で探索時間を削減できる'},
+  {kw:['介助','処置','バイタル','見守り','レク','加工','組立','施工','工事','診療'], core:true, ecrs:'none', reason:'サービス・製品価値を直接生み出すコア業務。時間確保を優先'},
+  {kw:['休憩','休息'],                                                     core:false, ecrs:'none', reason:'法定休憩は削減対象外。取得時間の適正化（分散/集中）は交換で検討可'},
+  {kw:['食事','昼食','ランチ'],                                            core:false, ecrs:'none', reason:'必要業務のため対象外。極端な長時間化がないかのみ分析で確認'},
+  {kw:['手待ち','待機'],                                                 core:false, ecrs:'E',    reason:'手待ち時間は工程・段取りの見直しで排除すべき最大のムダ'},
+  {kw:['段取り','準備','清掃','整理','棚卸','在庫'],                     core:false, ecrs:'S',    reason:'標準化・5S・レイアウト改善で作業時間を簡素化できる'},
+  {kw:['シフト','勤怠','経費','請求','伝票','レセプト'],                 core:false, ecrs:'S',    reason:'システム・自動化ツール導入で処理時間を大幅短縮できる定型業務'},
+];
+
+window.app = {
+  state: {
+    tasks: [],        // {id, name, cat, core:null|true|false, ecrs:null|'E'|'C'|'R'|'S'|'none', aiReason:null}
+    logs: [],         // {taskId, start(ms), end(ms), sec}
+    running: null,    // {taskId, start}
+    profile: null,    // {industry, job} 業種×職種
+    rewardUntil: 0,   // リワード広告視聴による詳細プラン解放期限(ms)
+  },
+  timerInterval: null,
+  _obSel: {industry:null, job:null},
+
+  /* ---------- 初期化 ---------- */
+  init(){
+    const saved = localStorage.getItem('gyomu-kaizen-v1');
+    if(saved){
+      try{ this.state = JSON.parse(saved); }catch(e){ /* 破損時は初期化 */ }
+    }
+    if(!this.state.tasks || this.state.tasks.length===0){
+      this.state.tasks = DEFAULT_TASKS.map(t=>({...t, core:null, ecrs:null, aiReason:null}));
+    }
+    // 計測中のまま閉じた場合の復元
+    if(this.state.running){ this.startTicker(); }
+    this.renderAll();
+    // 初回起動（業種×職種 未設定 かつ 記録なし）→ オンボーディング表示
+    if(!this.state.profile && this.state.logs.length===0){ this.openOnboard(false); }
+  },
+
+  /* ---------- 業種×職種オンボーディング ---------- */
+  openOnboard(fromSettings){
+    if(fromSettings) this.closeModal('modalSettings');
+    this._obSel = this.state.profile? {...this.state.profile} : {industry:null, job:null};
+    this.renderOnboard();
+    document.getElementById('modalOnboard').classList.add('show');
+  },
+  obPickIndustry(ind){
+    this._obSel.industry = ind; this._obSel.job = null;
+    this.renderOnboard();
+  },
+  obPickJob(job){
+    this._obSel.job = job;
+    this.renderOnboard();
+  },
+  renderOnboard(){
+    const sel = this._obSel;
+    document.getElementById('obIndustry').innerHTML = Object.keys(PRESETS).map(ind=>
+      '<button class="'+(sel.industry===ind?'sel':'')+'" onclick="app.obPickIndustry(\''+ind+'\')">'+ind+'</button>').join('');
+    const jobLabel = document.getElementById('obJobLabel');
+    const jobEl = document.getElementById('obJob');
+    if(sel.industry && PRESETS[sel.industry]){
+      jobLabel.style.display = 'block';
+      jobEl.innerHTML = Object.keys(PRESETS[sel.industry]).map(j=>
+        '<button class="'+(sel.job===j?'sel':'')+'" onclick="app.obPickJob(\''+j+'\')">'+j+'</button>').join('');
+    }else{
+      jobLabel.style.display = 'none'; jobEl.innerHTML = '';
+    }
+    // プレビュー & 開始ボタン
+    const pv = document.getElementById('obPreview');
+    const startBtn = document.getElementById('obStart');
+    const ok = sel.industry && sel.job && PRESETS[sel.industry][sel.job];
+    if(ok){
+      pv.classList.add('show');
+      pv.innerHTML = '<b>基本メニュー（'+PRESETS[sel.industry][sel.job].length+'件）</b><br>'+
+        PRESETS[sel.industry][sel.job].map(t=>t.name).join('｜');
+      startBtn.disabled = false; startBtn.style.opacity = '1';
+    }else{
+      pv.classList.remove('show');
+      startBtn.disabled = true; startBtn.style.opacity = '.4';
+    }
+  },
+  applyOnboard(){
+    const {industry, job} = this._obSel;
+    if(!industry || !job) return;
+    this.state.profile = {industry, job};
+    // 記録がある業務は保持し、記録ゼロの業務をプリセットに入れ替える
+    const usedIds = new Set(this.state.logs.map(l=>l.taskId));
+    const kept = this.state.tasks.filter(t=>usedIds.has(t.id));
+    const keptNames = new Set(kept.map(t=>t.name));
+    const preset = [...PRESETS[industry][job], ...COMMON_TASKS]
+      .filter(p=>!keptNames.has(p.name))
+      .map((p,i)=>({id:'t'+Date.now()+'_'+i, name:p.name, cat:p.cat, core:null, ecrs:null, aiReason:null}));
+    this.state.tasks = [...kept, ...preset];
+    this.closeModal('modalOnboard');
+    this.save(); this.renderAll();
+    this.toast(industry+'×'+job+' の業務メニューを作成しました');
+  },
+  skipOnboard(){
+    this.state.profile = {industry:'その他（汎用）', job:'未設定'};
+    this.closeModal('modalOnboard');
+    this.save(); this.renderAll();
+  },
+  save(){ localStorage.setItem('gyomu-kaizen-v1', JSON.stringify(this.state)); },
+
+  /* ---------- 共通UI ---------- */
+  switchTab(btn){
+    document.querySelectorAll('nav.tabbar button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(btn.dataset.screen).classList.add('active');
+    this.renderAll();
+  },
+  toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+  },
+  openSettings(){ document.getElementById('modalSettings').classList.add('show'); },
+  closeModal(id){ document.getElementById(id).classList.remove('show'); },
+
+  fmt(sec){
+    sec = Math.round(sec);
+    const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  },
+  fmtShort(sec){
+    const h = Math.floor(sec/3600), m = Math.round(sec%3600/60);
+    if(h>0) return h+'時間'+(m>0? m+'分':'');
+    return m+'分';
+  },
+
+  /* ---------- ① 計測 ---------- */
+  tapTask(taskId){
+    const now = Date.now();
+    if(this.state.running){
+      if(this.state.running.taskId === taskId){ this.stopTimer(); return; }
+      this.commitLog(now);  // 別業務タップ→切替
+    }
+    this.state.running = {taskId, start: now};
+    this.startTicker();
+    this.save();
+    this.renderTimer();
+    const t = this.state.tasks.find(t=>t.id===taskId);
+    this.toast('「'+t.name+'」の計測を開始しました');
+  },
+  stopTimer(){
+    if(!this.state.running) return;
+    this.commitLog(Date.now());
+    this.state.running = null;
+    clearInterval(this.timerInterval);
+    this.save();
+    this.renderTimer();
+    this.toast('計測を終了しました');
+  },
+  commitLog(endMs){
+    const r = this.state.running;
+    const sec = (endMs - r.start)/1000;
+    if(sec >= 3){ // 3秒未満の誤タップは記録しない
+      this.state.logs.push({taskId:r.taskId, start:r.start, end:endMs, sec});
+    }
+  },
+  startTicker(){
+    clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(()=>{
+      if(!this.state.running) return;
+      const sec = (Date.now() - this.state.running.start)/1000;
+      document.getElementById('timerTime').textContent = this.fmt(sec);
+    }, 500);
+  },
+  deleteLog(idx){
+    this.state.logs.splice(idx,1);
+    this.save(); this.renderAll();
+  },
+  addTask(){
+    const name = document.getElementById('newTaskName').value.trim();
+    if(!name){ this.toast('業務名を入力してください'); return; }
+    const cat = document.getElementById('newTaskCat').value;
+    this.state.tasks.push({id:'t'+Date.now(), name, cat, core:null, ecrs:null, aiReason:null});
+    document.getElementById('newTaskName').value = '';
+    this.closeModal('modalAdd');
+    this.save(); this.renderAll();
+  },
+
+  renderTimer(){
+    const disp = document.getElementById('timerDisplay');
+    const stopBtn = document.getElementById('stopBtn');
+    if(this.state.running){
+      const t = this.state.tasks.find(t=>t.id===this.state.running.taskId);
+      disp.classList.add('running');
+      document.getElementById('timerTask').innerHTML = '<span class="rec-dot"></span>'+ this.esc(t.name) +' を計測中';
+      stopBtn.style.display = 'flex';
+    }else{
+      disp.classList.remove('running');
+      document.getElementById('timerTime').textContent = '00:00:00';
+      document.getElementById('timerTask').textContent = '業務ボタンをタップして計測開始';
+      stopBtn.style.display = 'none';
+    }
+    // 業務ボタングリッド
+    const grid = document.getElementById('taskGrid');
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    grid.innerHTML = this.state.tasks.map(t=>{
+      const todaySec = this.state.logs.filter(l=>l.taskId===t.id && l.start>=todayStart.getTime()).reduce((a,l)=>a+l.sec,0);
+      const running = this.state.running && this.state.running.taskId===t.id;
+      return '<button class="task-btn'+(running?' running':'')+'" onclick="app.tapTask(\''+t.id+'\')">'+
+        '<span class="cat">'+this.esc(t.cat)+'</span>'+ this.esc(t.name) +
+        (todaySec>0? '<span class="today">本日 '+this.fmtShort(todaySec)+'</span>':'') +
+        '</button>';
+    }).join('') + '<button class="task-btn add" onclick="document.getElementById(\'modalAdd\').classList.add(\'show\')">＋ 業務を追加</button>';
+
+    // 本日の記録
+    const todayLogs = this.state.logs.map((l,i)=>({...l,i})).filter(l=>l.start>=todayStart.getTime()).reverse();
+    const list = document.getElementById('logList');
+    document.getElementById('logEmpty').style.display = todayLogs.length? 'none':'block';
+    const totalSec = todayLogs.reduce((a,l)=>a+l.sec,0);
+    document.getElementById('todayTotal').textContent = todayLogs.length? '合計 '+this.fmtShort(totalSec) : '';
+    list.innerHTML = todayLogs.map(l=>{
+      const t = this.state.tasks.find(t=>t.id===l.taskId);
+      const st = new Date(l.start);
+      return '<li><span>'+this.esc(t?t.name:'?')+'</span>'+
+        '<span class="t">'+String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0')+
+        '〜 ('+this.fmtShort(l.sec)+') <button class="del" onclick="app.deleteLog('+l.i+')">✕</button></span></li>';
+    }).join('');
+  },
+
+  /* ---------- ② 棚卸し ---------- */
+  taskTotals(){
+    const map = {};
+    this.state.logs.forEach(l=>{ map[l.taskId]=(map[l.taskId]||0)+l.sec; });
+    return this.state.tasks
+      .map(t=>({...t, total: map[t.id]||0}))
+      .filter(t=>t.total>0)
+      .sort((a,b)=>b.total-a.total);
+  },
+  setCore(taskId, core){
+    const t = this.state.tasks.find(t=>t.id===taskId);
+    t.core = core; this.save(); this.renderInventory();
+  },
+  setEcrs(taskId, ecrs){
+    const t = this.state.tasks.find(t=>t.id===taskId);
+    t.ecrs = (t.ecrs===ecrs)? null : ecrs; this.save(); this.renderInventory();
+  },
+  /* 【CODEX】ここをLLM API呼び出しに置換する（ファイル冒頭コメント参照） */
+  aiClassify(task){
+    for(const rule of AI_RULES){
+      if(rule.kw.some(k=>task.name.includes(k) || task.cat.includes(k))){
+        return {core:rule.core, ecrs:rule.ecrs, reason:rule.reason};
+      }
+    }
+    return {core:false, ecrs:'S', reason:'定型的業務の可能性。手順の簡素化・標準化を検討'};
+  },
+  aiClassifyAll(){
+    const items = this.taskTotals();
+    if(items.length===0){ this.toast('計測データがありません'); return; }
+    let n=0;
+    items.forEach(item=>{
+      const t = this.state.tasks.find(x=>x.id===item.id);
+      const r = this.aiClassify(t);
+      t.core = r.core; t.ecrs = r.ecrs; t.aiReason = r.reason; n++;
+    });
+    this.save(); this.renderInventory();
+    this.toast('AIが'+n+'件を自動判定しました（手動で修正できます）');
+  },
+
+  renderInventory(){
+    const items = this.taskTotals();
+    const list = document.getElementById('invList');
+    document.getElementById('invEmpty').style.display = items.length? 'none':'block';
+    document.getElementById('invCount').textContent = items.length? items.length+'業務' : '';
+    const grand = items.reduce((a,t)=>a+t.total,0);
+    list.innerHTML = items.map(t=>{
+      const pct = grand? Math.round(t.total/grand*100):0;
+      return '<div class="inv-item">'+
+        '<div class="head"><span class="name">'+this.esc(t.name)+
+          (t.core===true? ' <span class="pill core">コア</span>': t.core===false? ' <span class="pill noncore">非コア</span>':'')+
+        '</span><span class="time">'+this.fmtShort(t.total)+'（'+pct+'%）</span></div>'+
+        '<div class="seg">'+
+          '<button class="'+(t.core===true?'sel-core':'')+'" onclick="app.setCore(\''+t.id+'\',true)">🎯 コア業務</button>'+
+          '<button class="'+(t.core===false?'sel-noncore':'')+'" onclick="app.setCore(\''+t.id+'\',false)">⚙ 非コア業務</button>'+
+        '</div>'+
+        '<div class="ecrs">'+ Object.keys(ECRS_DEF).map(k=>
+          '<button class="'+(t.ecrs===k?'sel':'')+'" onclick="app.setEcrs(\''+t.id+'\',\''+k+'\')">'+
+          '<span class="en">'+ECRS_DEF[k].en+'</span>'+ECRS_DEF[k].ja+'</button>'
+        ).join('')+'</div>'+
+        (t.aiReason? '<div class="ai-reason show">🤖 AI判定理由：'+this.esc(t.aiReason)+'</div>':'')+
+      '</div>';
+    }).join('');
+  },
+
+  /* ---------- ③ 分析 ---------- */
+  renderAnalysis(){
+    const items = this.taskTotals();
+    const grand = items.reduce((a,t)=>a+t.total,0);
+    const coreSec = items.filter(t=>t.core===true).reduce((a,t)=>a+t.total,0);
+    const noncoreSec = items.filter(t=>t.core===false).reduce((a,t)=>a+t.total,0);
+    const unsetSec = grand - coreSec - noncoreSec;
+
+    document.getElementById('kpiTotal').textContent = grand? this.fmtShort(grand):'-';
+    document.getElementById('kpiTasks').textContent = items.length||'-';
+    document.getElementById('kpiCore').textContent = grand&&(coreSec+noncoreSec)>0? Math.round(coreSec/grand*100)+'%':'-';
+    document.getElementById('kpiNoncore').textContent = grand&&(coreSec+noncoreSec)>0? Math.round(noncoreSec/grand*100)+'%':'-';
+
+    // ドーナツチャート（Canvas手描き / 【CODEX】Chart.js等への置換可）
+    const cv = document.getElementById('donut'), ctx = cv.getContext('2d');
+    ctx.clearRect(0,0,150,150);
+    const data = [
+      {v:coreSec, c:'#0a5cb8', l:'コア業務'},
+      {v:noncoreSec, c:'#e8920a', l:'非コア業務'},
+      {v:unsetSec, c:'#d4dae2', l:'未分類'},
+    ].filter(d=>d.v>0);
+    let ang = -Math.PI/2;
+    data.forEach(d=>{
+      const slice = grand? d.v/grand*Math.PI*2 : 0;
+      ctx.beginPath();
+      ctx.arc(75,75,60,ang,ang+slice);
+      ctx.strokeStyle = d.c; ctx.lineWidth = 26; ctx.stroke();
+      ang += slice;
+    });
+    document.getElementById('donutLegend').innerHTML = data.map(d=>
+      '<div><span class="sw" style="background:'+d.c+'"></span>'+d.l+'：'+this.fmtShort(d.v)+
+      '（'+(grand?Math.round(d.v/grand*100):0)+'%）</div>').join('') || '<div class="muted">データなし</div>';
+
+    // 業務別バー（上位8）
+    const bar = document.getElementById('barChart');
+    const top = items.slice(0,8);
+    const max = top.length? top[0].total:1;
+    bar.innerHTML = top.map(t=>{
+      const color = t.core===true? 'var(--core)': t.core===false? 'var(--noncore)':'#9aa7b5';
+      return '<div class="bar-row"><div class="lbl"><span>'+this.esc(t.name)+'</span><span>'+this.fmtShort(t.total)+'</span></div>'+
+        '<div class="track"><div class="fill" style="width:'+Math.round(t.total/max*100)+'%;background:'+color+'"></div></div></div>';
+    }).join('') || '<div class="muted">データなし</div>';
+
+    // ECRS別バー
+    const ecrsMap = {};
+    items.forEach(t=>{ if(t.ecrs && t.ecrs!=='none') ecrsMap[t.ecrs]=(ecrsMap[t.ecrs]||0)+t.total; });
+    const ecrsColors = {E:'#e0453a', C:'#e8920a', R:'#7b5cd6', S:'#00a389'};
+    const emax = Math.max(...Object.values(ecrsMap), 1);
+    document.getElementById('ecrsChart').innerHTML = ['E','C','R','S'].map(k=>{
+      const v = ecrsMap[k]||0;
+      return '<div class="bar-row"><div class="lbl"><span><b>'+k+'</b> '+ECRS_DEF[k].ja+'（'+ECRS_DEF[k].desc+'）</span><span>'+(v?this.fmtShort(v):'－')+'</span></div>'+
+        '<div class="track"><div class="fill" style="width:'+Math.round(v/emax*100)+'%;background:'+ecrsColors[k]+'"></div></div></div>';
+    }).join('');
+  },
+
+  /* ---------- ④ 改善提案 ---------- */
+  /* 【CODEX】本実装では分類済みデータをLLMに渡し自由記述の提案を生成する */
+  renderProposals(regen){
+    const items = this.taskTotals().filter(t=>t.core!==null || t.ecrs);
+    const listEl = document.getElementById('proposalList');
+    const sumCard = document.getElementById('proposalSummary');
+    document.getElementById('propEmpty').style.display = items.length? 'none':'block';
+    if(!items.length){ listEl.innerHTML=''; sumCard.style.display='none'; return; }
+
+    const grand = this.taskTotals().reduce((a,t)=>a+t.total,0);
+    // 削減ポテンシャル係数（ECRS別の想定削減率）
+    const RATE = {E:0.8, C:0.4, R:0.3, S:0.5};
+    const TPL = {
+      E:{title:'の「排除」を検討', body:(t)=>'この業務は本当に必要か、目的から見直しましょう。オンライン化・承認プロセスの廃止・頻度の削減など、業務自体をなくす/減らすことで最大の効果が見込めます。', tag:'優先度 高', cls:'p-high'},
+      C:{title:'の「結合」を検討', body:(t)=>'類似業務や会議をまとめて実施することで、準備・切替のムダを削減できます。定例化・バッチ処理化・アジェンダの統合を検討しましょう。', tag:'優先度 中', cls:'p-mid'},
+      R:{title:'の「交換」を検討', body:(t)=>'実施する順序・担当者・場所を入れ替えることで効率化できる可能性があります。情報の一元化や、スキルに応じた担当替えを検討しましょう。', tag:'優先度 中', cls:'p-mid'},
+      S:{title:'の「簡素化」を検討', body:(t)=>'テンプレート化・マニュアル化・RPAや生成AIによる自動化で、作業時間を大幅に短縮できます。まず手順を書き出し、自動化可能な工程を特定しましょう。', tag:'優先度 中', cls:'p-mid'},
+    };
+
+    let totalSaving = 0;
+    const cards = [];
+    // 非コア×ECRS指定あり → 改善提案（時間の大きい順）
+    items.filter(t=>t.ecrs && t.ecrs!=='none').sort((a,b)=>b.total-a.total).forEach(t=>{
+      const tpl = TPL[t.ecrs];
+      const saving = t.total * RATE[t.ecrs];
+      totalSaving += saving;
+      cards.push('<div class="proposal '+tpl.cls+'"><div class="p-head"><span class="p-title">「'+this.esc(t.name)+'」'+tpl.title+'</span><span class="p-tag">'+tpl.tag+'</span></div>'+
+        '<div class="p-body">'+tpl.body(t)+ (t.aiReason? '<br><span style="color:var(--accent);font-size:12px;">🤖 '+this.esc(t.aiReason)+'</span>':'')+'</div>'+
+        '<div class="p-saving">▼ 想定削減時間：約'+this.fmtShort(saving)+'（現状 '+this.fmtShort(t.total)+' × 削減率'+Math.round(RATE[t.ecrs]*100)+'%）</div></div>');
+    });
+    // コア業務 → 時間拡大の提案
+    const coreItems = items.filter(t=>t.core===true && (!t.ecrs || t.ecrs==='none'));
+    if(coreItems.length){
+      cards.push('<div class="proposal p-low"><div class="p-head"><span class="p-title">コア業務への時間再配分</span><span class="p-tag">推奨</span></div>'+
+        '<div class="p-body">'+coreItems.map(t=>'「'+this.esc(t.name)+'」').join('、')+'は価値創出に直結するコア業務です。非コア業務の削減で生まれた時間をこれらに再配分することで、成果の最大化が期待できます。</div></div>');
+    }
+    listEl.innerHTML = cards.join('');
+
+    // サマリー
+    if(totalSaving>0 && grand>0){
+      sumCard.style.display = 'block';
+      const pct = Math.round(totalSaving/grand*100);
+      document.getElementById('proposalSummaryBody').innerHTML =
+        '記録された総業務時間 <b>'+this.fmtShort(grand)+'</b> のうち、ECRSの実行により<br>'+
+        '<span style="font-size:20px;font-weight:800;color:var(--accent);">約'+this.fmtShort(totalSaving)+'（'+pct+'%）</span> の削減ポテンシャルがあります。<br>'+
+        '<span class="muted">※削減率はECRS分類ごとの想定値（E:80% / C:40% / R:30% / S:50%）による試算です。</span>';
+    }else{
+      sumCard.style.display = 'none';
+    }
+    if(regen) this.toast('提案を再生成しました');
+    this.renderRewardSection(items);
+  },
+
+  /* ---------- リワード広告（モック） ----------
+     【CODEX】本実装ではAdMob Rewarded Ad SDKに置換。
+     ユニット: Reward_main / ca-app-pub-5840457424714744/2329997478
+     - 視聴完了コールバック(onUserEarnedReward)で unlockReward() を呼ぶ
+     - 解放期間は24時間（rewardUntilに期限を保存）
+     - 有償版/クライアント契約版では広告なしで常時解放にする */
+  rewardActive(){ return Date.now() < (this.state.rewardUntil||0); },
+  renderRewardSection(items){
+    const el = document.getElementById('rewardSection');
+    const targets = items.filter(t=>t.ecrs && t.ecrs!=='none').sort((a,b)=>b.total-a.total).slice(0,3);
+    if(!targets.length){ el.innerHTML=''; return; }
+    if(this.rewardActive()){
+      const until = new Date(this.state.rewardUntil);
+      const DETAIL = {
+        E:['この業務の目的と受益者を書き出し、「なくなったら誰が困るか」を確認する','オンライン化・頻度削減・承認スキップなど代替手段を1つ選ぶ','1〜2週間の試行期間を設けて廃止・削減を検証し、問題なければ標準化する'],
+        C:['類似の業務・会議・移動をリストアップし、まとめられる組み合わせを特定する','実施タイミングを揃える（定例化・バッチ処理化）ルールを決める','統合後の所要時間を計測し、切替ロスの削減効果を確認する'],
+        R:['業務の工程を書き出し、順序・担当・場所のボトルネックを特定する','「誰が・いつ・どこで」を入れ替えた場合の効率を比較検討する','最も効果的な入替案を1つ試行し、前後の時間を本アプリで計測比較する'],
+        S:['業務の手順を書き出し、判断が不要な定型工程を特定する','テンプレート・チェックリスト・RPA/生成AIなど自動化手段を割り当てる','自動化後の作業時間を計測し、削減効果を数値で確認する'],
+      };
+      el.innerHTML = '<div class="reward-unlocked-note">✅ 詳細アクションプラン解放中（'+
+        (until.getMonth()+1)+'/'+until.getDate()+' '+String(until.getHours()).padStart(2,'0')+':'+String(until.getMinutes()).padStart(2,'0')+' まで）</div>'+
+        targets.map(t=>'<div class="detail-plan"><div class="dp-title">📋 「'+this.esc(t.name)+'」実行ステップ（'+ECRS_DEF[t.ecrs].ja+'）</div>'+
+          '<ol>'+DETAIL[t.ecrs].map(s=>'<li>'+s+'</li>').join('')+'</ol></div>').join('');
+    }else{
+      el.innerHTML = '<div class="reward-lock">'+
+        '<div class="rl-title">🔒 詳細アクションプラン（上位'+targets.length+'業務）</div>'+
+        '<div class="rl-desc">短い動画を見ると、各業務の具体的な実行ステップが<br>24時間見放題になります。</div>'+
+        '<button class="btn" onclick="app.openReward()">▶ 動画を見て解放する</button></div>';
+    }
+  },
+  openReward(){
+    document.getElementById('modalReward').classList.add('show');
+    const btn = document.getElementById('rewardDoneBtn');
+    const cnt = document.getElementById('rewardCount');
+    btn.disabled = true; btn.style.opacity = '.4'; btn.textContent = '視聴完了までお待ちください';
+    let n = 5; // モックは5秒（実広告は15〜30秒）
+    cnt.textContent = n;
+    clearInterval(this._rewardTimer);
+    this._rewardTimer = setInterval(()=>{
+      n--; cnt.textContent = Math.max(n,0);
+      if(n<=0){
+        clearInterval(this._rewardTimer);
+        btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🎁 報酬を受け取る（詳細プランを解放）';
+      }
+    }, 1000);
+  },
+  finishReward(){
+    this.state.rewardUntil = Date.now() + 24*3600*1000;
+    this.save();
+    this.closeModal('modalReward');
+    this.renderProposals(false);
+    this.toast('詳細アクションプランを24時間解放しました');
+  },
+
+  /* ---------- ユーティリティ ---------- */
+  esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+
+  renderAll(){
+    // ヘッダーに業種×職種を表示
+    const p = this.state.profile;
+    document.getElementById('appSub').innerHTML = (p && p.job!=='未設定')
+      ? 'タイムスタディ × ECRS分析 <span class="profile-chip">'+this.esc(p.industry)+'×'+this.esc(p.job)+'</span>'
+      : 'タイムスタディ × ECRS分析';
+    this.renderTimer();
+    this.renderInventory();
+    this.renderAnalysis();
+    this.renderProposals(false);
+  },
+
+  /* ---------- 設定系 ---------- */
+  loadSampleData(){
+    const now = Date.now(), H = 3600*1000;
+    const mk = (taskId, hoursAgo, sec)=>({taskId, start:now-hoursAgo*H, end:now-hoursAgo*H+sec*1000, sec});
+    this.state.logs = [
+      mk('t1', 8, 5400), mk('t2', 6.5, 4500), mk('t3', 5, 6300),
+      mk('t4', 3.5, 2700), mk('t5', 2.5, 4200), mk('t6', 1.2, 3300),
+      mk('t7', 7, 900),  mk('t8', 4, 3600),
+      mk('t1', 30, 7200), mk('t2', 28, 3600), mk('t5', 26, 5400), mk('t4', 25, 1800),
+      mk('t7', 31, 900), mk('t8', 28.5, 3600),
+    ];
+    this.state.tasks.forEach(t=>{t.core=null;t.ecrs=null;t.aiReason=null;});
+    this.closeModal('modalSettings');
+    this.save(); this.renderAll();
+    this.toast('サンプルデータを投入しました');
+  },
+  exportCSV(){
+    if(!this.state.logs.length){ this.toast('記録がありません'); return; }
+    const rows = [['業務名','カテゴリ','開始','終了','時間(分)','コア/非コア','ECRS']];
+    this.state.logs.forEach(l=>{
+      const t = this.state.tasks.find(t=>t.id===l.taskId) || {};
+      rows.push([t.name||'?', t.cat||'', new Date(l.start).toLocaleString('ja-JP'), new Date(l.end).toLocaleString('ja-JP'),
+        (l.sec/60).toFixed(1), t.core===true?'コア':t.core===false?'非コア':'', t.ecrs? ECRS_DEF[t.ecrs].ja:'']);
+    });
+    const csv = '\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = 'gyomu-log.csv'; a.click();
+  },
+  resetAll(){
+    if(!confirm('全データを削除します。よろしいですか？')) return;
+    localStorage.removeItem('gyomu-kaizen-v1');
+    this.state = {tasks: DEFAULT_TASKS.map(t=>({...t,core:null,ecrs:null,aiReason:null})), logs:[], running:null, profile:null};
+    clearInterval(this.timerInterval);
+    this.closeModal('modalSettings');
+    this.renderAll();
+    this.toast('リセットしました');
+    this.openOnboard(false); // 業種×職種の再選択から開始
+  },
+};
+
+app.init();
+
+/* ---------- Capacitor / AdMob bridge ---------- */
+(function setupNativeBridge(){
+  const cap = window.Capacitor;
+  const plugins = cap && cap.Plugins ? cap.Plugins : {};
+  const AdMob = plugins.AdMob;
+  const StatusBar = plugins.StatusBar;
+  const SplashScreen = plugins.SplashScreen;
+  const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+  const adUnits = {
+    banner: 'ca-app-pub-5840457424714744/9086977514',
+    reward: 'ca-app-pub-5840457424714744/2329997478'
+  };
+
+  async function initNativeAds(){
+    if(!isNative || !AdMob) return;
+    try{
+      await StatusBar?.setBackgroundColor?.({ color: '#0a5cb8' });
+      await StatusBar?.setStyle?.({ style: 'DARK' });
+    }catch(e){}
+    try{
+      const tracking = await AdMob.trackingAuthorizationStatus?.();
+      let npa = tracking && tracking.status && tracking.status !== 'authorized';
+      if(tracking && tracking.status === 'notDetermined'){
+        const requested = await AdMob.requestTrackingAuthorization?.();
+        npa = requested && requested.status !== 'authorized';
+      }
+      await AdMob.initialize();
+      await AdMob.addListener?.('bannerAdSizeChanged', function(info){
+        const height = Number(info && info.height || 50);
+        document.documentElement.style.setProperty('--banner-h', height + 'px');
+        const mock = document.getElementById('adBanner');
+        if(mock) mock.style.visibility = 'hidden';
+      });
+      await AdMob.addListener?.('onRewarded', function(){ app.finishReward(); });
+      await AdMob.showBanner({
+        adId: adUnits.banner,
+        adSize: 'BANNER',
+        position: 'BOTTOM_CENTER',
+        isTesting: false,
+        npa: !!npa
+      });
+    }catch(e){
+      const mock = document.getElementById('adBanner');
+      if(mock) mock.innerHTML = '<span class="ad-label">AD</span>広告を準備中';
+    }finally{
+      try{ await SplashScreen?.hide?.(); }catch(e){}
+    }
+  }
+
+  if(isNative && AdMob){
+    const fallbackReward = app.openReward.bind(app);
+    app.openReward = async function(){
+      try{
+        await AdMob.prepareRewardVideoAd({ adId: adUnits.reward, isTesting: false });
+        await AdMob.showRewardVideoAd();
+      }catch(e){
+        this.toast('広告を読み込めませんでした。時間をおいて再度お試しください');
+        fallbackReward();
+      }
+    };
+  }
+  initNativeAds();
+})();
+
+</script>
 </body>
 </html>
