@@ -1,0 +1,16 @@
+{
+  "name": "業務改善ナビ",
+  "short_name": "改善ナビ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a5cb8",
+  "theme_color": "#0a5cb8",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "1024x1024",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
