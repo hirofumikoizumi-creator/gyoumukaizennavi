@@ -8,6 +8,9 @@ workflows:
     environment:
       node: 22
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: GSW.com.gyomukaizennavi
       vars:
         APP_ID: GSW.com.gyomukaizennavi
         BUNDLE_ID: GSW.com.gyomukaizennavi
