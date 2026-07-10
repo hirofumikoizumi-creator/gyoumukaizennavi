@@ -171,6 +171,10 @@ nav.tabbar button .badge{
 }
 .modal .row{display:flex;gap:10px;}
 .modal .row .btn{flex:1;}
+.modal textarea{
+  width:100%;min-height:220px;padding:12px;border:1.5px solid var(--line);border-radius:10px;
+  font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;background:#fff;
+}
 /* ---------- 業種×職種オンボーディング ---------- */
 .modal-bg.center{align-items:center;padding:16px;}
 .modal-bg.center .modal{border-radius:18px;max-height:86vh;overflow-y:auto;}
@@ -399,6 +403,20 @@ nav.tabbar button .badge{
     <button class="btn ghost block" style="margin-bottom:10px;" onclick="app.exportCSV()">📤 記録をCSVエクスポート</button>
     <button class="btn danger block" style="margin-bottom:10px;" onclick="app.resetAll()">🗑 全データをリセット</button>
     <button class="btn block" onclick="app.closeModal('modalSettings')">閉じる</button>
+  </div>
+</div>
+
+<!-- CSV出力モーダル -->
+<div class="modal-bg center" id="modalExport">
+  <div class="modal">
+    <h3>CSV出力</h3>
+    <p class="muted" style="margin-bottom:10px;">iPhoneでファイル保存が開かない場合は、下の内容をコピーしてメモ・メール・スプレッドシートへ貼り付けてください。</p>
+    <textarea id="csvText" readonly></textarea>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn ghost" onclick="app.copyCSV()">コピー</button>
+      <button class="btn ghost" onclick="app.downloadCSV()">保存を試す</button>
+    </div>
+    <button class="btn block" style="margin-top:10px;" onclick="app.closeModal('modalExport')">閉じる</button>
   </div>
 </div>
 
@@ -1034,31 +1052,76 @@ window.app = {
   /* ---------- 設定系 ---------- */
   loadSampleData(){
     const now = Date.now(), H = 3600*1000;
-    const mk = (taskId, hoursAgo, sec)=>({taskId, start:now-hoursAgo*H, end:now-hoursAgo*H+sec*1000, sec});
-    this.state.logs = [
-      mk('t1', 8, 5400), mk('t2', 6.5, 4500), mk('t3', 5, 6300),
-      mk('t4', 3.5, 2700), mk('t5', 2.5, 4200), mk('t6', 1.2, 3300),
-      mk('t7', 7, 900),  mk('t8', 4, 3600),
-      mk('t1', 30, 7200), mk('t2', 28, 3600), mk('t5', 26, 5400), mk('t4', 25, 1800),
-      mk('t7', 31, 900), mk('t8', 28.5, 3600),
-    ];
-    this.state.tasks.forEach(t=>{t.core=null;t.ecrs=null;t.aiReason=null;});
+    const tasks = (this.state.tasks && this.state.tasks.length ? this.state.tasks : DEFAULT_TASKS)
+      .map((t,i)=>({...t, id:t.id || 'sample_'+i, core:null, ecrs:null, aiReason:null}));
+    this.state.tasks = tasks;
+    const todaySecs = [5400, 4500, 6300, 2700, 4200, 3300, 900, 3600, 2400, 1800];
+    const prevSecs = [7200, 3600, 5400, 1800, 2700, 1500, 900, 2400, 2100, 1200];
+    const logs = [];
+    tasks.slice(0, Math.min(tasks.length, todaySecs.length)).forEach((t,i)=>{
+      const start = now - (8 - i * 0.85) * H;
+      logs.push({taskId:t.id, start, end:start + todaySecs[i] * 1000, sec:todaySecs[i]});
+    });
+    tasks.slice(0, Math.min(tasks.length, prevSecs.length)).forEach((t,i)=>{
+      const start = now - (32 - i * 0.75) * H;
+      logs.push({taskId:t.id, start, end:start + prevSecs[i] * 1000, sec:prevSecs[i]});
+    });
+    this.state.logs = logs;
+    this.state.running = null;
+    tasks.forEach(t=>{
+      const r = this.aiClassify(t);
+      t.core = r.core; t.ecrs = r.ecrs; t.aiReason = r.reason;
+    });
     this.closeModal('modalSettings');
     this.save(); this.renderAll();
     this.toast('サンプルデータを投入しました');
   },
-  exportCSV(){
-    if(!this.state.logs.length){ this.toast('記録がありません'); return; }
+  buildCSV(){
     const rows = [['業務名','カテゴリ','開始','終了','時間(分)','コア/非コア','ECRS']];
     this.state.logs.forEach(l=>{
       const t = this.state.tasks.find(t=>t.id===l.taskId) || {};
       rows.push([t.name||'?', t.cat||'', new Date(l.start).toLocaleString('ja-JP'), new Date(l.end).toLocaleString('ja-JP'),
         (l.sec/60).toFixed(1), t.core===true?'コア':t.core===false?'非コア':'', t.ecrs? ECRS_DEF[t.ecrs].ja:'']);
     });
-    const csv = '\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+    return '\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  },
+  async exportCSV(){
+    if(!this.state.logs.length){ this.toast('記録がありません'); return; }
+    const csv = this.buildCSV();
+    document.getElementById('csvText').value = csv.replace(/^\uFEFF/, '');
+    this.closeModal('modalSettings');
+    if(typeof File !== 'undefined'){
+      const file = new File([csv], 'gyomu-log.csv', {type:'text/csv'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        try{
+          await navigator.share({files:[file], title:'業務改善ナビ 記録CSV'});
+          return;
+        }catch(e){}
+      }
+    }
+    document.getElementById('modalExport').classList.add('show');
+    this.toast('CSVをコピーまたは保存できます');
+  },
+  async copyCSV(){
+    const ta = document.getElementById('csvText');
+    ta.focus(); ta.select();
+    try{
+      await navigator.clipboard.writeText(ta.value);
+      this.toast('CSVをコピーしました');
+    }catch(e){
+      document.execCommand('copy');
+      this.toast('選択中のCSVをコピーしました');
+    }
+  },
+  downloadCSV(){
+    const csv = '\uFEFF' + document.getElementById('csvText').value;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-    a.download = 'gyomu-log.csv'; a.click();
+    a.download = 'gyomu-log.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   },
   resetAll(){
     if(!confirm('全データを削除します。よろしいですか？')) return;
