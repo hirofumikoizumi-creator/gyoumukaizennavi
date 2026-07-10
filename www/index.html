@@ -190,7 +190,7 @@ nav.tabbar button .badge{
   display:inline-block;font-size:10px;background:rgba(255,255,255,.18);color:#fff;
   border-radius:8px;padding:1px 8px;margin-left:6px;vertical-align:1px;
 }
-/* ---------- 広告（モック） ---------- */
+/* ---------- 広告 ---------- */
 /* 【CODEX】ネイティブ実装時はAdMob SDKに置換。
    banner_main: ca-app-pub-5840457424714744/9086977514
    Reward_main: ca-app-pub-5840457424714744/2329997478 */
@@ -338,9 +338,9 @@ nav.tabbar button .badge{
   <div class="empty" id="propEmpty"><span class="big">💡</span>「棚卸し」タブでコア/非コアとECRSを分類すると、<br>改善方針を提案します。</div>
 </section>
 
-<!-- 広告バナー枠（モック）【CODEX】AdMob banner_main に置換 -->
+<!-- 広告バナー枠【CODEX】AdMob banner_main に置換 -->
 <div class="ad-banner" id="adBanner">
-  <span class="ad-label">AD</span>バナー広告枠 320×50（banner_main）
+  <span class="ad-label">AD</span>広告を読み込み中
 </div>
 
 <!-- ==================== タブバー ==================== -->
@@ -402,14 +402,14 @@ nav.tabbar button .badge{
   </div>
 </div>
 
-<!-- リワード広告モーダル（モック）【CODEX】AdMob Reward_main のSDK呼び出しに置換 -->
+<!-- リワード広告モーダル【CODEX】AdMob Reward_main のSDK呼び出しに置換 -->
 <div class="modal-bg center" id="modalReward">
   <div class="modal" style="text-align:center;">
-    <h3>🎬 動画広告（モック）</h3>
+    <h3>🎬 動画広告</h3>
     <div class="reward-video">
-      <div class="rv-count" id="rewardCount">5</div>
+      <div class="rv-count" id="rewardCount">15</div>
       <div>広告動画を再生中…</div>
-      <div style="font-size:10px;opacity:.6;">実装時はここでAdMobリワード動画が再生されます</div>
+
     </div>
     <button class="btn block" id="rewardDoneBtn" disabled style="opacity:.4;" onclick="app.finishReward()">視聴完了までお待ちください</button>
   </div>
@@ -962,7 +962,7 @@ window.app = {
     this.renderRewardSection(items);
   },
 
-  /* ---------- リワード広告（モック） ----------
+  /* ---------- リワード広告 ----------
      【CODEX】本実装ではAdMob Rewarded Ad SDKに置換。
      ユニット: Reward_main / ca-app-pub-5840457424714744/2329997478
      - 視聴完了コールバック(onUserEarnedReward)で unlockReward() を呼ぶ
@@ -997,7 +997,7 @@ window.app = {
     const btn = document.getElementById('rewardDoneBtn');
     const cnt = document.getElementById('rewardCount');
     btn.disabled = true; btn.style.opacity = '.4'; btn.textContent = '視聴完了までお待ちください';
-    let n = 5; // モックは5秒（実広告は15〜30秒）
+    let n = 15;
     cnt.textContent = n;
     clearInterval(this._rewardTimer);
     this._rewardTimer = setInterval(()=>{
@@ -1124,14 +1124,12 @@ app.init();
   }
 
   if(isNative && AdMob){
-    const fallbackReward = app.openReward.bind(app);
     app.openReward = async function(){
       try{
         await AdMob.prepareRewardVideoAd({ adId: adUnits.reward, isTesting: false });
         await AdMob.showRewardVideoAd();
       }catch(e){
         this.toast('広告を読み込めませんでした。時間をおいて再度お試しください');
-        fallbackReward();
       }
     };
   }
