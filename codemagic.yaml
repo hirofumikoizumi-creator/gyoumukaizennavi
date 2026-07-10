@@ -13,6 +13,7 @@ workflows:
         bundle_identifier: GSW.com.gyomukaizennavi
       vars:
         APP_ID: GSW.com.gyomukaizennavi
+        BUNDLE_ID: GSW.com.gyomukaizennavi
         AD_ENV: prod
     triggering:
       events:
@@ -22,13 +23,18 @@ workflows:
         script: npm ci
       - name: Capacitor sync
         script: npx cap sync ios
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Increment build number
         script: |
           cd ios/App
           agvtool new-version -all $(($BUILD_NUMBER))
       - name: Build ipa
         script: |
-          xcode-project use-profiles
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App
